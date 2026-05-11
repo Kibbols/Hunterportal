@@ -298,10 +298,16 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--frost); 
   <!-- Moments -->
   <div class="card">
     <div class="card-label">02 — Moments</div>
-    <div class="tab-bar">
-      <button class="tab active" id="tab-screenshot" onclick="switchTab('screenshot')">📸 Screenshot</button>
-      <button class="tab" id="tab-manual" onclick="switchTab('manual')">✏️ Manual</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div class="tab-bar" style="margin-bottom:0;border-bottom:none;flex:1">
+        <button class="tab active" id="tab-screenshot" onclick="switchTab('screenshot')">📸 Screenshot</button>
+        <button class="tab" id="tab-manual" onclick="switchTab('manual')">✏️ Manual</button>
+      </div>
+      <label class="btn-sm" style="cursor:pointer;margin:0;flex-shrink:0" title="Load a previously saved moments file">
+        📂 Load saved<input type="file" accept=".json" style="display:none" onchange="importMoments(event)" />
+      </label>
     </div>
+    <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
 
     <div id="pane-screenshot">
       <div class="upload-zone" id="uploadZone"
