@@ -594,14 +594,30 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--frost); 
 
   function loadScreenshotFile(file) {
     if (!file.type.startsWith('image/')) { alert('Please upload an image file.'); return; }
-    screenshotMime = file.type || 'image/png';
     const reader = new FileReader();
     reader.onload = ev => {
-      screenshotBase64 = ev.target.result.split(',')[1];
-      document.getElementById('screenshotPreview').src = ev.target.result;
-      document.getElementById('screenshotPreviewWrap').style.display = 'block';
-      document.getElementById('uploadZone').style.display = 'none';
-      document.getElementById('ocrStatus').textContent = '';
+      const img = new Image();
+      img.onload = () => {
+        // Resize so longest dimension is max 2048px — keeps full content visible to Gemini in one call
+        const MAX = 2048;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (h > w) { w = Math.round(w * MAX / h); h = MAX; }
+          else { h = Math.round(h * MAX / w); w = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        // Always encode as JPEG for smaller payload
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        screenshotBase64 = dataUrl.split(',')[1];
+        screenshotMime = 'image/jpeg';
+        document.getElementById('screenshotPreview').src = dataUrl;
+        document.getElementById('screenshotPreviewWrap').style.display = 'block';
+        document.getElementById('uploadZone').style.display = 'none';
+        document.getElementById('ocrStatus').textContent = '';
+      };
+      img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
   }
