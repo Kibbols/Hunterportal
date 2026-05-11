@@ -598,18 +598,16 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--frost); 
     reader.onload = ev => {
       const img = new Image();
       img.onload = () => {
-        // Resize so longest dimension is max 2048px — keeps full content visible to Gemini in one call
-        const MAX = 2048;
+        // Cap width at 768px — Highlight Hunter cards are narrow, text stays readable
+        // Height is uncapped so long lists aren't cropped
+        const MAX_W = 768;
         let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          if (h > w) { w = Math.round(w * MAX / h); h = MAX; }
-          else { h = Math.round(h * MAX / w); w = MAX; }
-        }
+        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        // Always encode as JPEG for smaller payload
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        // JPEG at 0.75 — sharp enough for text, much smaller payload
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
         screenshotBase64 = dataUrl.split(',')[1];
         screenshotMime = 'image/jpeg';
         document.getElementById('screenshotPreview').src = dataUrl;
@@ -643,16 +641,24 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--frost); 
     statusEl.textContent = 'Sending to Gemini…';
 
     try {
-      const prompt = `This is a screenshot from FrostyTools Highlight Hunter showing detected VOD moments. Each moment card shows a time range like "0:03:00 - 0:03:16" and a title label beneath it.
+      const prompt = `This is a screenshot from FrostyTools Highlight Hunter. It is a long scrollable list of VOD moment cards. There may be 10, 20, 30 or more cards — scan the ENTIRE image from top to bottom and do not stop early.
 
-Extract every moment. Output ONLY one line per moment in this exact format with nothing else:
+Each card shows a timestamp range like "0:07:43 - 0:07:54" and a description label beneath it like "Self Deprecating Humor in Gaming".
+
+Your task: extract EVERY single card visible in the image without skipping any.
+
+Output ONLY one line per moment, in this exact format:
 START_TIME | END_TIME | TITLE
 
-Use both timestamps exactly as shown and the description label. No preamble, no numbering, no markdown.
+Rules:
+- Read every card from top to bottom, do not stop until you reach the bottom of the image
+- No preamble, no numbering, no markdown, no extra text
+- If a title is cut off, include what is visible
 
-Example:
-0:03:00 | 0:03:16 | Streamer gets jump-scared by customer
-0:05:52 | 0:06:21 | Making Radioactive Slushies for Customers`;
+Example output:
+0:07:43 | 0:07:54 | Self Deprecating Humor in Gaming
+0:12:17 | 0:12:28 | Streamer Fails to Help Teammate
+0:19:05 | 0:19:26 | Miscommunication with the Editor`;
 
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
@@ -664,7 +670,7 @@ Example:
               { inline_data: { mime_type: screenshotMime, data: screenshotBase64 } },
               { text: prompt }
             ]}],
-            generationConfig: { maxOutputTokens: 1000, temperature: 0 }
+            generationConfig: { maxOutputTokens: 4096, temperature: 0 }
           })
         }
       );
