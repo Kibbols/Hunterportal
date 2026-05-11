@@ -594,30 +594,78 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--frost); 
 
   function loadScreenshotFile(file) {
     if (!file.type.startsWith('image/')) { alert('Please upload an image file.'); return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => {
-        // Cap width at 768px — Highlight Hunter cards are narrow, text stays readable
-        // Height is uncapped so long lists aren't cropped
-        const MAX_W = 768;
-        let w = img.width, h = img.height;
-        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        // JPEG at 0.75 — sharp enough for text, much smaller payload
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-        screenshotBase64 = dataUrl.split(',')[1];
-        screenshotMime = 'image/jpeg';
-        document.getElementById('screenshotPreview').src = dataUrl;
+    const statusEl = document.getElementById('ocrStatus');
+    statusEl.style.color = 'var(--muted)';
+    statusEl.textContent = 'Loading image…';
+
+    // Use blob URL — most reliable way to load images on Android
+    const blobUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onerror = () => {
+      URL.revokeObjectURL(blobUrl);
+      // Last resort: send raw base64 with no resize
+      const r = new FileReader();
+      r.onload = ev => {
+        screenshotBase64 = ev.target.result.split(',')[1];
+        screenshotMime = file.type || 'image/jpeg';
+        document.getElementById('screenshotPreview').src = ev.target.result;
         document.getElementById('screenshotPreviewWrap').style.display = 'block';
         document.getElementById('uploadZone').style.display = 'none';
-        document.getElementById('ocrStatus').textContent = '';
+        statusEl.style.color = 'var(--warning)';
+        statusEl.textContent = `⚠ Resize failed — sending original`;
       };
-      img.src = ev.target.result;
+      r.readAsDataURL(file);
     };
-    reader.readAsDataURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(blobUrl);
+      const origW = img.naturalWidth || img.width;
+      const origH = img.naturalHeight || img.height;
+      const MAX_W = 768;
+      let w = origW, h = origH;
+      if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+
+      let dataUrl;
+      try {
+        dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        // Sanity check — if toDataURL returned a tiny string it likely failed silently
+        if (dataUrl.length < 1000) throw new Error('toDataURL returned empty result');
+      } catch(e) {
+        // toDataURL blocked (e.g. CORS taint) — fall back to raw
+        const r = new FileReader();
+        r.onload = ev => {
+          screenshotBase64 = ev.target.result.split(',')[1];
+          screenshotMime = file.type || 'image/jpeg';
+          document.getElementById('screenshotPreview').src = ev.target.result;
+          document.getElementById('screenshotPreviewWrap').style.display = 'block';
+          document.getElementById('uploadZone').style.display = 'none';
+          statusEl.style.color = 'var(--warning)';
+          statusEl.textContent = `⚠ Resize blocked — sending original`;
+        };
+        r.readAsDataURL(file);
+        return;
+      }
+
+      screenshotBase64 = dataUrl.split(',')[1];
+      screenshotMime = 'image/jpeg';
+      document.getElementById('screenshotPreview').src = dataUrl;
+      document.getElementById('screenshotPreviewWrap').style.display = 'block';
+      document.getElementById('uploadZone').style.display = 'none';
+      const kb = Math.round(screenshotBase64.length * 0.75 / 1024);
+      statusEl.style.color = 'var(--success)';
+      statusEl.textContent = `✓ Resized ${origW}×${origH} → ${w}×${h} (≈${kb} KB)`;
+    };
+
+    img.src = blobUrl;
   }
 
   function clearScreenshot() {
