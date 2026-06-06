@@ -709,7 +709,7 @@ Example output:
 0:19:05 | 0:19:26 | Miscommunication with the Editor`;
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -916,6 +916,7 @@ Example output:
       duration,
     });
     if (title) params.set('title', title.substring(0,100));
+    params.set('is_featured', 'true');
     const res = await fetch(`https://api.twitch.tv/helix/videos/clips?${params}`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${auth.token}`, 'Client-Id': auth.clientId }
